@@ -1,0 +1,232 @@
+#!/bin/zsh
+
+####################
+# Shortcuts
+####################
+
+# filesystem
+alias cp='cp -rv'       # Always copy (r)ecursively and (v)erbose
+alias mv='mv -v'        # always move (v)erbose
+alias mkd="mkdir -v"    # make directory (v)erbose
+
+alias c="clear"         # clear terminal
+alias e="exit"          # exit terminal
+alias :q="exit"         # exit terminal
+
+alias _='sudo'          # 
+alias sudo='sudo '      # allows sudo to run in aliases
+alias rd='rm -rfv'      # remove recursively, force and verbose
+
+# navigation
+alias -g ...='../..'
+alias -g ....='../../..'
+alias -g .....='../../../..'
+alias ~="cd ~"
+alias -- -="cd -"
+
+# listing
+alias l='ls -lFh'     # size,show type,human readable
+alias la='ls -lAFh'   # long list,show almost all,show type,human readable
+alias ll='ls -ltFh'   # long list,sorted by date,show type,human readable
+alias lsc='ls -1FSsh' # list with items count and index
+alias lsh='ls -ld .*' # show only hidden
+
+# requires lsd 
+# https://github.com/Peltoche/lsd
+alias lsa='lsd -lA'   # list all
+alias lla='lsd -l'    # list long
+alias lsTre'lsd --all --tree --depth 4'
+
+# git
+alias g="git"
+alias ga='git add'
+alias gaa='git add --all'
+alias gs='git status'
+alias gp='git push'
+alias gpd='git push --dry-run'
+alias gcl='git clone'
+alias gcs='git commit -S'
+alias gf='git fetch'
+alias gm='git merge'
+alias undopush="git push -f origin HEAD^:master"  # Undo a `git push`
+
+# programming & editors
+alias vi="vim"
+alias ys="yarn start"
+alias yr="yarn run"
+alias nr="npm run"
+alias nom="rm -rf node_modules && npm cache verify && npm i"
+alias yom="rm -rf node_modules && yarn cache clean && yarn"
+alias pi="pip3"
+alias py="python3"
+
+# Misc
+# requires todo.sh 
+# https://github.com/WelcomWeb/todo-sh
+alias todo="todo.sh"
+alias t="todo.sh"
+# requires bat
+# https://github.com/sharkdp/bat
+alias catt="bat --paging=never --style=plain"
+
+# Display the size of files at depth 1 in current location in human-readable form
+alias dud="du -d 1 -h"
+# Display the size of files in current location in human-readable form
+alias duf="du -sh"
+
+########################################
+# shell (sh/zsh)
+########################################
+
+# Reload the shell (i.e. invoke as a login shell)
+alias reload='exec "${SHELL}" -l'
+
+# list all shells
+alias list_shells="cat /etc/shells"
+
+# Benchmark zsh with short result
+# > 1.86 real         0.85 user         0.52 sys
+alias zshBenchMark="/usr/bin/time zsh -i -c exit"
+
+########################################
+# System management
+########################################
+
+# Recursively delete `.DS_Store` files
+alias cleanup_dsstore="find . -type f -name '*.DS_Store' -ls -delete"
+# alias cleanup_system="zsh $HOME/utility-scripts/clearing-disk-space.sh"
+alias diskspace_report="df -P -kHl"
+# returns
+# Filesystem     Size   Used  Avail Capacity  Mounted on
+# /dev/disk1s1   245G    11G   121G     9%    /
+alias free_diskspace_report="diskspace_report"
+# Empty the Trash on all mounted volumes and the main HDD.
+# Also, clear Apple’s System Logs to improve shell startup speed.
+# Finally, clear download history from quarantine. https://mths.be/bum
+alias emptytrash="sudo rm -rfv /Volumes/*/.Trashes; \
+                  sudo rm -rfv ~/.Trash; \
+                  sudo rm -rfv /private/var/log/asl/*.asl; \
+                  sqlite3 ~/Library/Preferences/com.apple.LaunchServices.QuarantineEventsV* 'delete from LSQuarantineEvent'; \
+                  sudo rm -v /private/var/vm/sleepimage;"
+
+# networking
+alias netstat="sudo lsof -i -P"
+alias ports="ports ls"
+alias my_ip_Local="ipconfig getifaddr en0"
+alias my_ip_Public="dig +short myip.opendns.com @resolver1.opendns.com"
+alias whats_on_port80="sudo lsof -i :80"
+alias firewall_status="sudo /usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate"
+# returns a list of hardware ports
+alias list_hardware_ports"networksetup -listallhardwareports"
+alias show_power_settings="sudo pmset -g"
+
+########################################
+# Package management
+########################################
+
+### Node.js
+# returns a list of all global packages installed with npm
+alias npm-ls-global="npm list -g --depth 0"
+
+# returns a list of all global packages installed with yarn
+alias yarn-ls-global="yarn global list"
+
+# Interactive cli for upgrading global packages with yarn
+alias yarn-g-update="yarn global upgrade-interactive"
+alias npm-update-global="npm-check -g -u"
+# Homebrew
+alias brew-upgrade-all="brew -v upgrade"
+
+# Will list all homebrew packages with their deps in tree structure
+alias brew_list_all_installed="brew deps --installed --tree --include-build --include-requirements"
+
+# Homebrew/homebrew-bundle
+alias brew_bundle_update="brew bundle install -v"
+alias brew_bundle_cleanup="brew bundle cleanup -v -f"
+alias brew_bundle_update_brewfile="brew bundle dump --force --describe --no-restart"
+
+# this will list all items in Brewfile, then all formulaes
+alias homebrew_list-all="brew bundle list --brews --casks --taps --mas; brew leaves"
+
+# Python
+alias update-pip-packages='pip3 list --outdated --format=freeze | grep -v "^\-e" | cut -d = -f 1  | xargs -n1 pip3 install -U'
+
+alias update-gems="sudo gem update --system"
+
+alias update-rust="rustup update"
+
+# Update all macOS software
+# python packages
+# global node_modules & npm
+# rust
+# zsh: antibody + plugins, antigen + plugins, then cleanup
+function system_update() {
+  feco "> Mac system"
+  sudo softwareupdate -i -a
+
+  feco "> Node, npm & yarn"
+  npm-check -gy && npm install -g npm@latest
+
+  brew reinstall yarn
+  yarn global upgrade
+  yarn cache clean
+  npm cache verify
+
+  feco "> Pip"
+  update-pip-packages
+
+  feco "> Homebrew, casks and Mac app store (mas)"
+  brew upgrade && brew update
+
+  feco "> casks & mas"
+  brew upgrade --cask && mas upgrade
+
+  feco "> Brew bundle"
+  brew_bundle_update_brewfile --global && brew_bundle_update --global
+
+  feco "> Rust"
+  update-rust
+
+  feco "> Brew cleanup"
+  brew cleanup --prune=all -v && brew bundle cleanup --force --verbose
+
+  feco "> Zsh antigen & antibody"
+  antigen update && antibody update
+
+  feco "> Brew doctor & setup caching"
+  antigen cache-gen
+
+  brew dr --verbose
+  figlet -c 'System update complete' | lolcat
+}
+
+function system_update_packages() {
+  echo "> Node, npm & yarn"
+  npm-check -gy && npm install -g npm@latest
+  brew reinstall yarn
+  yarn global upgrade
+  yarn cache clean
+  npm cache verify
+  echo "> Homebrew, casks and Mac app store (mas)"
+  brew upgrade && brew update
+  echo "> Brew bundle"
+  brew bundle dump --force --describe --no-restart --global && brew bundle install -v --global
+  echo "> Rust"
+  rustup update
+  echo "> Brew cleanup"
+  brew cleanup --prune=all -v && brew bundle cleanup --force --verbose
+  echo "> Zsh antigen & antibody"
+  antigen update && antibody update
+  echo "> Brew doctor & setup caching"
+  antigen cache-gen
+}
+
+########################################
+# Apps & misc
+########################################
+# Get week number
+alias week="date +%V"
+
+# Kill all the tabs in Chrome to free up memory
+# explained: http://www.commandlinefu.com/commands/view/402/exclude-grep-from-your-grepped-output-of-ps-alias-included-in-description
+alias chromekill="ps ux | grep '[C]hrome Helper --type=renderer' | grep -v extension-process | tr -s ' ' | cut -d ' ' -f2 | xargs kill"
