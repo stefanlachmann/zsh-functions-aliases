@@ -1,0 +1,559 @@
+#!/bin/bash
+
+#############################
+# Helpers and handlers      #
+###########################3#
+
+function error_message_cli() {
+  Red="0;31"   # Red fg
+  NC="\033[0m" # No Color (reset)
+  if [ -n "$1" ]; then
+    printf " ⛔ $@"
+  else
+    printf " ⛔ Something is off in the land of oz, most likely a missing argument"
+  fi
+}
+
+function _exists() {
+  if (hash "$@" 2>/dev/null); then
+    return 0
+  else
+    return 1
+  fi
+}
+
+####################
+# Git
+####################
+
+# add, commit and push
+function acp() {
+  git add .
+  git commit -m "$1"
+  git push
+}
+
+function git_prune_locals() {
+  echo "removing local branches that has been merged"
+  git branch --merged master | grep -v '^[ *]*master$' | xargs git branch -d
+  git branch -r | awk '{print $1}' | egrep -v -f /dev/fd/0 <(git branch -vv | grep origin) | awk '{print $1}' | xargs git branch -d
+}
+
+function get-all-updates() {
+  # external script
+  bash ~/utility-scripts/get-all-updates.sh "$PWD"
+}
+
+function git_get_code_changes() {
+  if [ -n "$1" ]; then
+    git log --format=format: --name-only | egrep -v '^$' | sort | uniq -c | sort -rg | head -$1
+  else
+    error_message_cli "missing number, how many files do you want to list the changes of"
+  fi
+}
+
+function get-all-updates() {
+  # external script
+  bash ~/utility-scripts/get-all-updates.sh "$PWD"
+}
+
+function git_current_branch() {
+  git symbolic-ref HEAD 2>/dev/null | sed -e 's/refs\/heads\///'
+}
+
+function git_origin() {
+  git ls-remote --get-url | sed -e 's/^.*\://' | sed -e 's/\.git.*//'
+}
+
+# creates a remote of the current branch
+function setupstream() {
+  BRANCH=$(git symbolic-ref HEAD 2>/dev/null | sed -e 's/refs\/heads\///')
+  SETUPUPSTREAM="$(git push --set-upstream origin ${BRANCH})"
+  echo "$SETUPUPSTREAM"
+}
+
+function create-remote-repo() {
+  if ! type hub >/dev/null; then
+    [ -n "$1" ] && hub create "$1"
+  else
+    echo 'please install hub'
+    echo 'brew install hub'
+  fi
+}
+
+function git-remove-secret-file() {
+  fileToFix="$1"
+  # -n = non-zero
+  # -z = returns true if string is 0 in length or null
+  if [ -n "$1" ] || [ ! -z "$fileToFix" ]; then
+    git filter-branch --force --index-filter \
+      'git rm --cached --ignore-unmatch "$1"' \
+      --prune-empty --tag-name-filter cat -- --all
+  else
+    echo 'you need to pass a file or path/to/file'
+    echo 'fix-git-secret filename.txt'
+  fi
+}
+
+#	create Awesome List using my GitHub stars! | https://github.com/maguowei/starred
+function create-my-git-awesome() {
+  #	Requires: $ pip install starred
+  echo 'creating markdown of my github stars'
+  starred --username 2lach --sort >My-Stars.md
+  echo 'completed'
+}
+
+########################################
+# Terminal Utils/Shorthands
+########################################
+
+# zip stuff
+function compress() {
+  # run with the pigz...
+  printf " 🗜 making $1.tar.gz"
+  [ -n "$1" ] && tar cf - "$1" | pigz -9 -p 32 >"$1".tar.gz && printf "\n parrallel gzip (🐷igz) finished"
+}
+
+function compress_with_password() {
+  zip -er "$1".zip "$1"
+}
+
+function cp_p() {
+  # copy with progressbar
+  rsync -WavP --human-readable --progress $1 $2
+}
+# exit iTerm gracefully
+function exitIterm() {
+  if [ "$TERM_PROGRAM" = "iTerm.app" ]; then
+    osascript ~/utility-scripts/exit-iterm.as
+  else
+    exit
+  fi
+}
+alias quit=exitIterm
+
+function howdoi() {
+  hors "$@" -a -n 5 --paging never -e bing
+}
+
+function desc() {
+  if [ -n $1 ]; then
+    /usr/local/bin/tldr "$@"
+  else
+    error_message_cli "error missing arg, or install tldr"
+  fi
+}
+
+function search_man() {
+  if [ -n $1 ] && [ -n $2 ]; then
+    man $1 | grep -- $2
+  else
+    error_message_cli "needed variables missing, example: search_man wget continue"
+  fi
+}
+
+function describe-thingy() {
+  echo '1) man \n2) apropos \n3) whatis \n4) howdoi + "use " + '$@'\n'
+  if [ -n $1 ]; then
+    # echo 'man: '; man $@ || echo 'apropos: ' apropos $@ || echo 'whatis: ' whatis $@ || echo 'howdoi:' howdoi use $@
+    man "$@" || apropos "$@" || whatis "$@" || howdoi use "$@"
+  else
+    error_message_cli "please enter item to describe"
+  fi
+}
+alias describe="describe-thingy"
+
+function apps_online() {
+  # Show What Apps & Processes Are Using an Internet Connection
+  lsof -nPi | cut -f 1 -d " " | uniq | tail -n +2
+}
+
+function shellcheck_and_fmt() {
+  if [ -n "$1" ]; then
+    printf "running shellcheck on '$1' \n"
+    shellcheck "$1"
+    printf "\nshellcheck end \n\nRunning shellformat on '$1' \n"
+    shfmt -w "$1"
+    printf "\nshellformat end \n"
+  else
+    error_message_cli 'add a file as argument'
+  fi
+}
+
+function optimize-Images() {
+  # optimize images and enable imagealpha
+  if [ -n "$1" ]; then
+    imageoptim --imagealpha '**/*.png' "$1"
+  else
+    imageoptim .
+  fi
+}
+
+function makeicns() {
+  # script that make mac .icns file from *.png
+  if [ -n "$1" ]; then
+    bash $HOME/utility-scripts/make-mac-icons.sh "$1"
+  else
+    error_message_cli "please pass .png file to make icon"
+    exit 1
+  fi
+}
+alias="makeIcon"
+
+function readText() {
+  # Create Audiobook From Text
+  # Uses "Alex" voice, a plain UTF-8 encoded text file for input and AAC output.
+  #-------------------------
+  # can also be done with [cmd] + [esc]
+
+  if [ -n "$1" ] && [ -n "$2" ]; then
+    say -v Alex -f "$1" -o "$2.m4a"
+  else
+    echo "Error, the syntax is: readText filename.txt audioFileName"
+  fi
+}
+
+function convert2html() {
+  # Converts plain text, rich text (rtf) and Microsoft Word (doc/docx). File to HTML
+  if [ -n "$1" ]; then
+    textutil -convert html "$1"
+  else
+    echo 'file needed as argument'
+  fi
+}
+
+function hideFile() {
+  # this hides a file in finder
+  FileToHide="$(realpath $1)"
+  chflags hidden $FileToHide
+}
+
+function top() {
+  if _exists ytop; then
+    sudo ytop -s -c vice
+  elif _exists htop; then
+    sudo htop
+  else
+    sudo top
+  fi
+}
+
+function feco() {
+  if [ -n "$1" ]; then
+    echo '-------------------'
+    echo "$@" | lolcat
+    echo '-------------------'
+  fi
+}
+
+# Create a .tar.gz archive, using `zopfli`, `pigz` or `gzip` for compression
+targz() {
+  local tmpFile="${1%/}.tar"
+  tar -cvf "${tmpFile}" --exclude=".DS_Store" "${1}" || return 1
+  size=$(
+    stat -f"%z" "${tmpFile}" 2>/dev/null # OS X `stat`
+    stat -c"%s" "${tmpFile}" 2>/dev/null # GNU `stat`
+  )
+  local cmd=""
+  if ((size < 52428800)) && hash zopfli 2>/dev/null; then
+    # the .tar file is smaller than 50 MB and Zopfli is available; use it
+    cmd="zopfli"
+  else
+    if hash pigz 2>/dev/null; then
+      cmd="pigz"
+    else
+      cmd="gzip"
+    fi
+  fi
+  echo "Compressing .tar using '${cmd}'"
+  "${cmd}" -v "${tmpFile}" || return 1
+  [ -f "${tmpFile}" ] && rm "${tmpFile}"
+  echo "${tmpFile}.gz created successfully."
+}
+
+function lst() {
+  if _exists lsd; then
+    if [ ! -n "$1" ]; then
+      lsd -A --tree --depth "$1"
+    else
+      lsd -A --tree
+    fi
+  else
+    tre
+  fi
+}
+
+alias lst='lsd -A --tree --depth 2' # list (almost all) recursively
+tre() {
+
+  # `tre` shorthand for `tree
+  # it shows hidden files, color enabled, ignore .git` directories, lit dirs on top.
+  # Output piped into less, preserve color and line numbers
+  tree -aC -I '.git' --dirsfirst "$@" | less -FRNX
+}
+
+# `o` with no arguments opens the current directory, otherwise opens the given location
+function o() {
+  if [ "$#" -eq 0 ]; then
+    open .
+  else
+    open "$@"
+  fi
+}
+
+# find shorthand
+function f() {
+  find . -name "$1" 2>&1 | grep -v 'Permission denied'
+}
+
+function mdd() {
+  if [ ! -n "$1" ]; then
+    echo "Enter a directory name"
+  elif [ -d "$1" ]; then
+    echo "$1" + " already exists"
+  else
+    mkdir "$1" && cd "$1"
+  fi
+}
+
+function apps_ls_menu() {
+  # this requires fzf installed (gh/junegunn/fzf)
+  find /Applications -name "*.app" -maxdepth 2 | fzf --exit-0 | open
+}
+
+# Determine size of a file or total size of a directory
+function fs() {
+  if du -b /dev/null >/dev/null 2>&1; then
+    local arg=-sbh
+  else
+    local arg=-sh
+  fi
+  if [ -n "$@" ]; then
+    du $arg -- "$@"
+  else
+    du $arg .[^.]* ./*
+  fi
+}
+
+function cleanup_xcode() {
+  echo "Xcode caches current size:"
+  du -d 1 -h /Users/stefanlachmann/Library/Developer/CoreSimulator/Caches
+  echo 'press y to remove all xcode caches'
+  rm -rf /Users/stefanlachmann/Library/Developer/CoreSimulator/Caches/*
+
+}
+
+# that's all folks, Mark when a job has ended
+function its_ended() {
+  if [ "$#" -eq 0 ]; then
+    figlet -c "* It's done! *"
+  else
+    figlet -c "$@"
+  fi
+}
+
+function its_done() {
+  its_ended | lolcat
+}
+
+####################
+# Network/DNS
+####################
+
+function ip_addresses_and_other_info() {
+  echo "from ifconfig.me"
+  echo ""
+  echo "my public ip"
+  curl ifconfig.me
+
+  echo ""
+  echo "my user agent"
+  curl ifconfig.me/ua
+
+  echo ""
+  echo "all my info:"
+  curl ifconfig.me/all.json
+
+}
+
+# whois a domain or a URL
+function whois() {
+  local domain=$(echo "$1" | awk -F/ '{print $3}') # get domain from URL
+  if [ -z $domain ]; then
+    domain="$1"
+  fi
+  echo "Getting whois record for: $domain ..."
+  # avoid recursion
+  # this is the best whois server
+  # strip extra fluff
+  /usr/bin/whois -h whois.internic.net $domain | sed '/NOTICE:/q'
+}
+
+function localip() {
+  local if=$(netstat -rn | awk '/^0.0.0.0/ {thif=substr($0,74,10); print thif;} /^default.*UG/ {thif=substr($0,65,10); print thif;}')
+  local ip=$(ifconfig ${if} | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1')
+  echo $ip
+}
+
+# Run `dig` and display the most useful info
+function digga() {
+  dig +nocmd "$1"
+}
+
+# check if uri is up
+isup() {
+  if [ -n "$1" ]; then
+    local uri="$1"
+    if curl -s --head --request GET "$uri" | grep "200 OK" >/dev/null; then
+      error_message_cli "$uri is down"
+    else
+      echo "$uri is up"
+    fi
+  else
+    echo "pass a uri, please"
+  fi
+}
+
+####################
+# Security
+####################
+
+# check for malware rootkits etc
+# http://www.chkrootkit.org/
+function chk-rootkit() {
+  sudo ~/Security/chkrootkit-0.53/chkrootkit
+}
+
+# who is using the laptop's iSight camera?
+camerausedby() {
+  echo "Checking to see who is using the iSight camera… 📷"
+  usedby=$(lsof | grep -w "AppleCamera\|USBVDC\|iSight" | awk '{printf $2"\n"}' | xargs ps)
+  echo -e "Recent camera uses:\n$usedby"
+}
+
+####################
+# App tweaks
+####################
+
+# neovim
+v() {
+  if [ "$#" -eq 0 ]; then
+    nvim .
+  else
+    nvim "$@"
+  fi
+}
+# make google sync act more like a team player
+function googleSync-throttle() {
+  for f in $(
+    pgrep 'Backup and Sync'
+    pgrep 'FinderSyncAPIExtension'
+  ); do renice +20 -p $f; done
+}
+
+function googleSync-restore() {
+  for f in $(
+    pgrep 'Backup and Sync'
+    pgrep 'FinderSyncAPIExtension'
+  ); do renice 0 -p $f; done
+}
+
+function code-keymap() {
+  #opens github readme
+  open 'https://github.com/microsoft/vscode-vs-keybindings'
+}
+####################
+# zsh/bash
+####################
+
+# `shellswitch [bash |zsh]`
+function shellswitch() {
+  cd /etc/shell
+  chsh -s $(brew --prefix)/bin/$1
+  if [ $1 == "bash" ]; then
+    source ~/.bashrc
+  else
+    source ~/.zshrc
+  fi
+}
+
+function zshEdit() {
+  vim ~/.zshrc
+}
+
+# Benchmark Zsh load time
+function benchMarkZsh() {
+  for i in $(seq 1 10); do /usr/bin/time zsh -i -c exit; done
+  #return: 0.73 real         0.40 user         0.28 sys
+}
+
+# Automatically list directory contents on `cd`.
+function auto-ls() {
+  emulate -L zsh
+  hash gls >/dev/null 2>&1 && CLICOLOR_FORCE=1 gls -A --color=auto || ls
+}
+chpwd_functions=(auto-ls $chpwd_functions)
+
+function find_cmd() {
+  if [ "$#" -eq 0 ]; then
+    echo "please provide a command/function/alias"
+    exit 1
+  else
+    ag -l --hidden "$@" "$HOME" 2>/dev/null
+  fi
+}
+
+function explain() {
+  builtin which-command $@
+  builtin which $@
+  apropos $@
+  echo "to find '$@' run ~ find_cmd '$@'"
+  #   hash ag >/dev/null && ag -l --hidden "$@" "$HOME" 2>/dev/null
+}
+
+alias exp="explain"
+
+####################
+# Package managment
+####################
+function find_node_modules() {
+  cd
+  find . -name "node_modules" -type d -prune | xargs du -chs
+}
+
+function find_py_cache() {
+  find . | grep -E "(__pycache__|\.pyc|\.pyo$)" | xargs du -chs
+}
+
+function brew_link_overwrite() {
+  # brew doctor
+  if [ "$#" -eq 0 ]; then
+    echo 'this with overwrite "$@"'
+    echo "dry run"
+    brew ln "$@" --dry-run
+    echo "overwrite"
+    brew link --overwrite --dry-run "$@"
+    brew ln "$@" --overwrite
+  else
+    echo "missing arg: brew/cask/formulae name"
+  fi
+  brew dr
+}
+
+brew_remove_file() {
+  if [ "$#" -eq 0 ]; then
+    echo 'this with remove "$@"'
+    cp -v "$1" "$HOME/Desktop"
+    trash "$1" || rm -rfv "$1"
+  else
+    echo "missing arg: file(s) path"
+  fi
+}
+
+function log-this() {
+  # function that logs output into file
+  # usage:x $ log-this $(some command)
+  logname="$(date +"%d-%m-%Y")"
+  echo "$@" | tee >$HOME/Desktop/logfile-$logname.log
+  echo "Completed, logged to $HOME/Desktop/logfile-$logname.log"
+}
